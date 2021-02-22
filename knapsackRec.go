@@ -1,11 +1,60 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"log"
+	"os"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 )
 
+// Driver code
+func main() {
+
+	fmt.Println("Number of cores: ", runtime.NumCPU())
+	W := 7
+	weights := make([]int, 0)
+	values := make([]int, 0)
+	readFile("p1.txt", &W, &weights, &values)
+	start := time.Now()
+	results := make(chan int, 2)
+	count := 0
+	KnapSack(W, weights, values, &results, &count)
+	fmt.Println(<-results)
+	end := time.Now()
+	fmt.Printf("Total runtime: %s\n", end.Sub(start))
+
+}
+func readFile(fileName string, W *int, wt *[]int, val *[]int) {
+	file, err := os.Open(fileName)
+	defer file.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	scanner.Scan()
+	j := scanner.Text()
+	i, _ := strconv.Atoi(j)
+	for scanner.Scan() {
+		if i == 0 {
+			*W, _ = strconv.Atoi(scanner.Text())
+
+		} else {
+			line := strings.Split(scanner.Text(), " ")
+			value, _ := strconv.Atoi(line[1])
+			*val = append(*val, value)
+			weight, _ := strconv.Atoi(line[2])
+			*wt = append(*wt, weight)
+			i--
+		}
+
+	}
+
+}
 func Max(x, y int) int {
 	if x < y {
 		return y
@@ -28,7 +77,11 @@ func KnapSack(W int, wt []int, val []int, ch *chan int, count *int) {
 	// this item cannot be included
 	// in the optimal solution
 	if wt[last] > W {
-		KnapSack(W, wt[:last], val[:last], ch, count)
+		if *count > len(wt)/4 {
+			KnapSack(W, wt[:last], val[:last], ch, count)
+		} else {
+			go KnapSack(W, wt[:last], val[:last], ch, count)
+		}
 
 		// Return the maximum of two cases:
 		// (1) nth item included
@@ -37,7 +90,7 @@ func KnapSack(W int, wt []int, val []int, ch *chan int, count *int) {
 		included := make(chan int, 2)
 		not := make(chan int, 1)
 		x := val[last]
-		if *count > len(wt)/2 {
+		if *count > len(wt)/4 {
 			KnapSack(W-wt[last], wt[:last], val[:last], &included, count)
 			KnapSack(W, wt[:last], val[:last], &not, count)
 		} else {
@@ -50,21 +103,4 @@ func KnapSack(W int, wt []int, val []int, ch *chan int, count *int) {
 		*ch <- Max(x, y)
 
 	}
-}
-
-// Driver code
-func main() {
-
-	fmt.Println("Number of cores: ", runtime.NumCPU())
-	W := 7
-	weights := []int{1, 2, 3, 5}
-	values := []int{1, 6, 10, 15}
-	start := time.Now()
-	results := make(chan int, 2)
-	count := 0
-	KnapSack(W, weights, values, &results, &count)
-	fmt.Println(<-results)
-	end := time.Now()
-	fmt.Printf("Total runtime: %s\n", end.Sub(start))
-
 }
